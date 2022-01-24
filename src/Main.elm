@@ -31,18 +31,16 @@ type alias Model
     }
 
 type Lesson
-  = Lesson Title
+  = Lesson
     { lessons : List Lesson
     }
-  | Guide Title
+  | Guide
     { content : Html ()
     }
-  | Puzzle Title
-    ( List -- history of attempts
-      { question : Html ()
-      , answer : Answer
-      }
-    )
+  | Puzzle
+    { current : List { question : Html (), answer : Answer }
+    , history : List (List { question : Html (), answer : Html () })
+    }
 
 type alias Title = String
 
@@ -74,11 +72,14 @@ type Answer
 init : () -> (Model, Cmd Msg)
 init _ =
   ( { lessons
-      = [ Puzzle ""
-          [ { question = text "When \\(a \\ne 0\\), there are two solutions to \\(ax^2 + bx + c = 0\\) and they are \\[x = {-b \\pm \\sqrt{b^2-4ac} \\over 2a}.\\]"
-            , answer = Text { validation = Regex.never, input = "", solution = Nothing }
-            }
-          ]
+      = [ Puzzle
+          { current
+            = [ { question = text "When \\(a \\ne 0\\), there are two solutions to \\(ax^2 + bx + c = 0\\) and they are \\[x = {-b \\pm \\sqrt{b^2-4ac} \\over 2a}.\\]"
+                , answer = Text { validation = Regex.never, input = "", solution = Nothing }
+                }
+              ]
+          , history = []
+          }
         ]
     }
   , Cmd.none
@@ -112,8 +113,8 @@ view model =
   |> List.concatMap
      ( \ lesson ->
          case lesson of
-           Puzzle title history ->
-             history
+           Puzzle {current} ->
+             current
              |> List.map (\ {question} -> div [] [ question ])
            _ -> [ div [] [ text "TODO" ] ]
      )
