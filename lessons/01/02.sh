@@ -13,7 +13,8 @@ $$a^2 + b^2 = c^2$$
 console.log(
   JSON.stringify([
     {
-      title: "title",
+      id: "123456",
+      title: "example puzzle",
       question,
       answer: 4,
       fudge: 0.0,
