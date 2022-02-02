@@ -124,8 +124,6 @@ subscriptions model =
 
 -- VIEW -----------------------------------------------------------------------
 
--- TODO: Consider putting the puzzle on the right and whatever guide on the left.
-
 view : Model -> Html Msg
 view model =
   case (model.puzzle, model.guide, model.lessons) of
