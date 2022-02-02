@@ -17,6 +17,7 @@ console.log(
       title: "example puzzle",
       question,
       answer: 4,
+      options: "INT",
       fudge: 0.0,
     },
   ])

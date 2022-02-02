@@ -11,6 +11,8 @@ import Browser
 import Html exposing (Html, div, text, p)
 import Html.Attributes as Attr
 import Regex exposing (Regex)
+import Http
+import Json.Decode as D
 
 
 -- MAIN -----------------------------------------------------------------------
@@ -27,18 +29,33 @@ main =
 -- MODEL ----------------------------------------------------------------------
 
 type alias Model
-  = { lessons : List Lesson
+  = { lessons : Loadable (List Lesson)
+    , guide : Maybe Guide
+    , puzzle : Maybe Puzzle
     }
+
+type Loadable a
+  = Loading
+  | Loaded a
+  | Error Http.Error
 
 type Lesson
   = Lesson
-    { lessons : List Lesson
+    { title : String
+    , hash : String
+    , lessons : List Lesson
     }
-  | Guide
-    { content : Html ()
+
+type alias Guide
+  = { title : String
+    , hash : String
+    , content : Html ()
     }
-  | Puzzle
-    { current : List { question : Html (), answer : Answer }
+
+type alias Puzzle
+  = { title : String
+    , hash : String
+    , current : Maybe (List { question : Html (), answer : Answer })
     , history : List (List { question : Html (), answer : Html () })
     }
 
@@ -71,31 +88,31 @@ type Answer
 
 init : () -> (Model, Cmd Msg)
 init _ =
-  ( { lessons
-      = [ Puzzle
-          { current
-            = [ { question = text "When \\(a \\ne 0\\), there are two solutions to \\(ax^2 + bx + c = 0\\) and they are \\[x = {-b \\pm \\sqrt{b^2-4ac} \\over 2a}.\\]"
-                , answer = Text { validation = Regex.never, input = "", solution = Nothing }
-                }
-              ]
-          , history = []
-          }
-        ]
+  ( { lessons = Loading
+    , guide = Nothing
+    , puzzle = Nothing
     }
-  , Cmd.none
+  , Http.get
+    { url = "https://localhost:3000/lessons"
+    , expect = Http.expectJson LessonsUpdated lessonsDecoder
+    }
   )
 
+lessonsDecoder = D.fail "TODO"
+  
 
 -- UPDATE ---------------------------------------------------------------------
 
 type Msg
   = NoOp
+  | LessonsUpdated (Result Http.Error (List Lesson))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    NoOp ->
+    _ ->
       (model, Cmd.none)
+
 
 
 -- SUBSCRIPTIONS --------------------------------------------------------------
@@ -107,16 +124,10 @@ subscriptions model =
 
 -- VIEW -----------------------------------------------------------------------
 
+-- TODO: Consider putting the puzzle on the right and whatever guide on the left.
+
 view : Model -> Html Msg
 view model =
-  model.lessons
-  |> List.concatMap
-     ( \ lesson ->
-         case lesson of
-           Puzzle {current} ->
-             current
-             |> List.map (\ {question} -> div [] [ question ])
-           _ -> [ div [] [ text "TODO" ] ]
-     )
-  |> div []
-  |> Html.map (\_ -> NoOp)
+  case (model.puzzle, model.guide, model.lessons) of
+    _ -> text "hello world"
+    

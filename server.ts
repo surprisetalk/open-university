@@ -14,25 +14,25 @@ const md5 = x => crypto.createHash(`md5`).update(x).digest(`hex`);
 app.use(bodyParser.json());
 
 const crawlLessons = fileName => {
-  const body = !!path.extname(fileName)
-    ? []
+  const children = !!path.extname(fileName)
+    ? undefined
     : fs.readdirSync(fileName)
       .map(fileName_ => path.join(fileName,fileName_))
       .map(crawlLessons);
-  const lesson = {
+  const parent = {
     title: path.parse(fileName).name.replace(/^\d+ /,``),
     hash: !!path.extname(fileName)
       ? md5(fs.readFileSync(fileName))
-      : md5(body.map(x => x.hash).join(``)),
-    body,
+      : md5(children.map(x => x.hash).join(``)),
+    lessons: children,
   };
   switch (path.parse(fileName).ext) {
-    case `.md`: lesson.type = `guide`; break;
-    case `.sh`: lesson.type = `puzzle`; break;
-    case ``: lesson.type = `lesson`; break;
+    case `.md`: parent.type = `guide`; break;
+    case `.sh`: parent.type = `puzzle`; break;
+    case ``: parent.type = `lesson`; break;
     default: throw new Error(fileName);
   }
-  return lesson;
+  return parent;
 };
 
 const lessons = fs.readdirSync(`${__dirname}/lessons`)
@@ -49,7 +49,7 @@ const guides = glob.sync(`${__dirname}/lessons/*/**.md`)
   .map(fileName => ({
     type: `guide`,
     title: path.parse(fileName).name.replace(/^\d+ /,``),
-    body: fs.readFileSync(fileName,`utf8`),
+    content: fs.readFileSync(fileName,`utf8`),
     hash: md5(fs.readFileSync(fileName)),
   }))
   .reduce((acc,val) => { acc[val.hash] = val; return acc; }, {});
@@ -71,11 +71,30 @@ const puzzles = glob.sync(`${__dirname}/lessons/*/**.sh`)
 
 console.log(`\n`,`PUZZLES`, JSON.stringify(puzzles,true,2));
 
+const openPuzzles = {};
+
+const pastPuzzles = {};
+
+app.put(`/puzzle/:hash`, (req, res) => {
+  openPuzzles[req.params.hash] = openPuzzles[req.params.hash] ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`));
+  res.status(204).send();
+});
+
+app.post(`/puzzle/:hash`, (req, res) => {
+  pastPuzzles[req.params.hash] =
+    (openPuzzles[req.params.hash].map(x => ({ ...x, guess: `TODO` })) ?? [])
+      .concat(pastPuzzles[req.params.hash]);
+  openPuzzles[req.params.hash] = undefined;
+  res.status(204).send();
+});
+
 app.get(`/puzzle/:hash`, (req, res) => {
-  const body = JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`));
   res.json({
     ...puzzles[req.params.hash],
-    body: body.map(x => ({ ...x, answer: undefined })),
+    current: openPuzzles[req.params.hash]
+      ? openPuzzles[req.params.hash].map(x => { x.answer = null; return x; })
+      : null,
+    history: pastPuzzles[req.params.hash] ?? [],
     path: undefined,
   });
 });
@@ -85,4 +104,4 @@ app.use((err, req, res, next) => {
   res.status(500).send({error: err});
 });
 
-app.listen(3000);
+app.listen(process.env.PORT ?? 3000);
