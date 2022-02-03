@@ -11,6 +11,8 @@ const bodyParser = require('body-parser');
 
 const md5 = x => crypto.createHash(`md5`).update(x).digest(`hex`);
 
+app.use(require(`cors`)())
+
 app.use(bodyParser.json());
 
 const crawlLessons = fileName => {
