@@ -159,6 +159,7 @@ update msg model =
     NoOp ->
       (model, Cmd.none)
     UrlRequested (Browser.Internal url) ->
+      -- TODO: If url starts with "/guide", start loading the guide, etc.
       (model, Nav.pushUrl model.key (Url.toString url))
     UrlRequested (Browser.External url) ->
       (model, Nav.load url)
