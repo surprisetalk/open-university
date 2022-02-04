@@ -114,7 +114,7 @@ init _ _ key =
     , puzzle = Nothing
     }
   , Http.get
-    { url = "http://localhost:3000/lessons"
+    { url = "/api/lessons"
     , expect = Http.expectJson LessonsFetched (D.list lessonDecoder)
     }
   )
@@ -201,14 +201,14 @@ update msg model =
       [ UrlParser.s "guide" </> UrlParser.string
         |> UrlParser.map
            (\ hash -> Http.get
-              { url = "http://localhost:3000/guide/" ++ hash
+              { url = "/api/guide/" ++ hash
               , expect = Http.expectJson GuideFetched guideDecoder
               }
            )
       , UrlParser.s "puzzle" </> UrlParser.string
         |> UrlParser.map
            (\ hash -> Http.get
-              { url = "http://localhost:3000/puzzle/" ++ hash
+              { url = "/api/puzzle/" ++ hash
               , expect = Http.expectJson PuzzleFetched puzzleDecoder
               }
            )
@@ -236,7 +236,7 @@ update msg model =
       , Http.request
         { method = "PUT"
         , headers = []
-        , url = "http://localhost:3000/puzzle/" ++ hash
+        , url = "/api/puzzle/" ++ hash
         , body = Http.emptyBody
         , expect = Http.expectWhatever (PuzzleRequestFinished hash)
         , timeout = Nothing
@@ -246,8 +246,8 @@ update msg model =
     PuzzleRequestFinished hash (Ok ()) ->
       ( model
       , Http.get
-        { url = "http://localhost:3000/guide/" ++ hash
-        , expect = Http.expectJson GuideFetched guideDecoder
+        { url = "/api/puzzle/" ++ hash
+        , expect = Http.expectJson PuzzleFetched puzzleDecoder
         }
       )
     PuzzleRequestFinished hash (Err error) ->

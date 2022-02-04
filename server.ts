@@ -16,7 +16,7 @@ app.use(require(`cors`)())
 
 app.use(bodyParser.json());
 
-app.use(express.static('public'));
+app.use(express.static(`public`));
 
 const crawlLessons = fileName => {
   const children = !!path.extname(fileName)
@@ -44,9 +44,9 @@ const lessons = fs.readdirSync(`${__dirname}/lessons`)
   .map(fileName => path.join(__dirname,`lessons`,fileName))
   .map(crawlLessons);
 
-console.log(`\n`,`LESSONS`, JSON.stringify(lessons,true,2));
+// console.log(`\n`,`LESSONS`, JSON.stringify(lessons,true,2));
 
-app.get(`/lessons`, (req, res) => {
+app.get(`/api/lessons`, (req, res) => {
   res.json(lessons);
 });
 
@@ -58,7 +58,7 @@ const guides = glob.sync(`${__dirname}/lessons/*/**.md`)
   }))
   .reduce((acc,val) => { acc[val.hash] = val; return acc; }, {});
 
-console.log(`\n`,`GUIDES`, JSON.stringify(guides,true,2));
+// console.log(`\n`,`GUIDES`, JSON.stringify(guides,true,2));
 
 app.get(`/guide/:hash`, (req, res) => {
   res.json(guides[req.params.hash]);
@@ -72,18 +72,18 @@ const puzzles = glob.sync(`${__dirname}/lessons/*/**.sh`)
   }))
   .reduce((acc,val) => { acc[val.hash] = val; return acc; }, {});
 
-console.log(`\n`,`PUZZLES`, JSON.stringify(puzzles,true,2));
+// console.log(`\n`,`PUZZLES`, JSON.stringify(puzzles,true,2));
 
 const openPuzzles = {};
 
 const pastPuzzles = {};
 
-app.put(`/puzzle/:hash`, (req, res) => {
+app.put(`/api/puzzle/:hash`, (req, res) => {
   openPuzzles[req.params.hash] = openPuzzles[req.params.hash] ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`));
   res.status(204).send();
 });
 
-app.post(`/puzzle/:hash`, (req, res) => {
+app.post(`/api/puzzle/:hash`, (req, res) => {
   pastPuzzles[req.params.hash] =
     (openPuzzles[req.params.hash].map(x => ({ ...x, guess: `TODO` })) ?? [])
       .concat(pastPuzzles[req.params.hash]);
@@ -91,7 +91,7 @@ app.post(`/puzzle/:hash`, (req, res) => {
   res.status(204).send();
 });
 
-app.get(`/puzzle/:hash`, (req, res) => {
+app.get(`/api/puzzle/:hash`, (req, res) => {
   res.json({
     ...puzzles[req.params.hash],
     current: openPuzzles[req.params.hash]
@@ -100,6 +100,10 @@ app.get(`/puzzle/:hash`, (req, res) => {
     history: pastPuzzles[req.params.hash] ?? [],
     path: undefined,
   });
+});
+
+app.use((req,res,next) => {
+  res.sendFile(path.join(__dirname,`public`,`index.html`));
 });
 
 app.use((err, req, res, next) => {
