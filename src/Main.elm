@@ -8,7 +8,7 @@ module Main exposing (..)
 
 import Dict exposing (Dict)
 import Browser
-import Html exposing (Html, div, text, p, a, ul, li, h1, h2, button)
+import Html exposing (Html, div, text, p, a, ul, li, h1, h2, button, input)
 import Html.Attributes as Attr exposing (href)
 import Html.Events as Event exposing (onClick)
 import Regex exposing (Regex)
@@ -84,23 +84,13 @@ type alias QA a
 type alias Title = String
 
 type Answer
-  = Int
-    { input : String
-    , solution : Maybe Int
-    }
-  | Float
-    { input : String
-    , solution : Maybe Float
-    }
-  | Text
+  = Text
     { validation : Regex
     , input : String
-    , solution : Maybe String
     }
   | MultipleChoice
-    { options : List (Html Msg)
+    { choices : List (Html Msg)
     , selected : Int
-    , solution : Maybe Int
     }
 
 
@@ -147,32 +137,24 @@ puzzleDecoder =
   D.map4 Puzzle
   (D.field "title" D.string)
   (D.field "hash" D.string)
-  (D.field "current" (D.maybe (D.list (qaDecoder optionsDecoder))))
+  (D.field "current" (D.maybe (D.list (qaDecoder choicesDecoder))))
   (D.field "history" (D.list (D.list (qaDecoder markdownDecoder))))
 
 qaDecoder p =
   D.map2 QA
   (D.field "question" markdownDecoder)
-  (D.field "options" p)
+  (D.field "choices" p)
 
-optionsDecoder
-  = D.oneOf
-    [ D.string
-      |> D.andThen
-         (\ x -> case x of
-            "INT" -> D.succeed
-              <| Int
-                 { input = ""
-                 , solution = Nothing
-                 }
-            _ -> D.fail "TODO"
-         )
-    ]
+choicesDecoder
+  = D.nullable (D.list markdownDecoder)
+    |> D.map
+       (\ answer -> case answer of
+            Nothing -> Text { validation = Regex.never, input = "" }
+            Just choices -> MultipleChoice { choices = choices, selected = 0 } 
+       )
 
-markdownDecoder = D.string
-  |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [Attr.id "math"])
+markdownDecoder = D.string |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [Attr.id "math"])
 
-  
 
 -- UPDATE ---------------------------------------------------------------------
 
@@ -296,6 +278,19 @@ viewPuzzle {title,hash,current,history} =
   , case current of
       Nothing -> button [ onClick (PuzzleRequested hash) ] [ text "Start" ]
       Just [] -> button [ onClick (PuzzleRequested hash) ] [ text "Start" ]
-      Just qas -> qas |> List.map (\{question} -> question) |> div []
+      Just qas -> qas |> List.map (viewQA viewAnswer) |> div []
   ]
+
+viewQA : (a -> Html Msg) -> QA a -> Html Msg
+viewQA viewA {question,answer} =
+  div []
+  [ question
+  , viewA answer
+  ]
+
+viewAnswer : Answer -> Html Msg
+viewAnswer answer = case answer of
+  Text { validation, input } -> Html.input [] []
+  MultipleChoice { choices, selected } -> text "TODO"
+  
   

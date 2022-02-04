@@ -15,7 +15,8 @@ console.log(
     {
       question,
       answer: "4",
-      options: "INT",
+      choices: null,
+      // choices: ["A","B"],
       fudge: 0.0,
     },
   ])
