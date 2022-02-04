@@ -60,7 +60,7 @@ const guides = glob.sync(`${__dirname}/lessons/*/**.md`)
 
 // console.log(`\n`,`GUIDES`, JSON.stringify(guides,true,2));
 
-app.get(`/guide/:hash`, (req, res) => {
+app.get(`/api/guide/:hash`, (req, res) => {
   res.json(guides[req.params.hash]);
 });
 

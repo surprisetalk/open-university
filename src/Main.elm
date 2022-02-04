@@ -107,16 +107,20 @@ type Answer
 -- INIT -----------------------------------------------------------------------
 
 init : () -> Url -> Nav.Key -> (Model, Cmd Msg)
-init _ _ key =
+init _ url key =
   ( { key = key
     , lessons = Loading
     , guide = Nothing
     , puzzle = Nothing
     }
-  , Http.get
-    { url = "/api/lessons"
-    , expect = Http.expectJson LessonsFetched (D.list lessonDecoder)
-    }
+  , Cmd.batch
+    [ route url
+      |> Maybe.withDefault Cmd.none
+    , Http.get
+      { url = "/api/lessons"
+      , expect = Http.expectJson LessonsFetched (D.list lessonDecoder)
+      }
+    ]
   )
 
 lessonDecoder =
@@ -132,15 +136,6 @@ lessonTypeDecoder typ =
     "guide" -> D.succeed LessonGuide
     "puzzle" -> D.succeed LessonPuzzle
     _ -> D.fail "TODO"
-
--- {                                                                                                              
---   "6f5902ac237024bdd0c176cb93063dc4": {                                                                                
---     "type": "guide",                                                                                                   
---     "title": "Test Guide",                                                                                             
---     "content": "hello world\n",                                                                                        
---     "hash": "6f5902ac237024bdd0c176cb93063dc4"                                                                         
---   }                                                                                                                    
--- }   
 
 guideDecoder =
   D.map3 Guide
@@ -175,7 +170,7 @@ optionsDecoder
     ]
 
 markdownDecoder = D.string
-  |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [])
+  |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [Attr.id "math"])
 
   
 
@@ -197,26 +192,9 @@ update msg model =
     NoOp ->
       (model, Cmd.none)
     UrlRequested (Browser.Internal url) ->
-      UrlParser.oneOf
-      [ UrlParser.s "guide" </> UrlParser.string
-        |> UrlParser.map
-           (\ hash -> Http.get
-              { url = "/api/guide/" ++ hash
-              , expect = Http.expectJson GuideFetched guideDecoder
-              }
-           )
-      , UrlParser.s "puzzle" </> UrlParser.string
-        |> UrlParser.map
-           (\ hash -> Http.get
-              { url = "/api/puzzle/" ++ hash
-              , expect = Http.expectJson PuzzleFetched puzzleDecoder
-              }
-           )
-      ]
-      |> UrlParser.map (Tuple.pair url)
-      |> (\ p -> UrlParser.parse p url)
-      |> Maybe.withDefault (Url.fromString "/" |> Maybe.withDefault url, Cmd.none)
-      |> (\ (newUrl, cmd) -> (model, Cmd.batch [cmd, Nav.pushUrl model.key (Url.toString newUrl)]))
+      case route url of
+        Nothing -> ({ model | guide = Nothing, puzzle = Nothing }, Nav.pushUrl model.key "/")
+        Just cmd -> (model, Cmd.batch [cmd, Nav.pushUrl model.key (Url.toString url)])
     UrlRequested (Browser.External url) ->
       (model, Nav.load url)
     LessonsFetched (Ok lessons) ->
@@ -255,6 +233,24 @@ update msg model =
     _ ->
       (model, Cmd.none)
 
+route : Url -> Maybe (Cmd Msg)
+route = UrlParser.parse <|
+  UrlParser.oneOf
+  [ UrlParser.s "guide" </> UrlParser.string
+    |> UrlParser.map
+       (\ hash -> Http.get
+          { url = "/api/guide/" ++ hash
+          , expect = Http.expectJson GuideFetched guideDecoder
+          }
+       )
+  , UrlParser.s "puzzle" </> UrlParser.string
+    |> UrlParser.map
+       (\ hash -> Http.get
+          { url = "/api/puzzle/" ++ hash
+          , expect = Http.expectJson PuzzleFetched puzzleDecoder
+          }
+       )
+  ]
 
 
 -- SUBSCRIPTIONS --------------------------------------------------------------

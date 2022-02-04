@@ -18,26 +18,21 @@
     <script src="/elm.js"></script>
   </head>
   <body>
-    <main id="main"></main>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+    <main></main>
     <script>
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']]
+        },
+        svg: {
+          fontCache: 'global'
+        }
+      };
+     </script>
+     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+     <script>
 
-     MathJax.Hub.Config({
-       skipStartupTypeset: true,
-       extensions: ["tex2jax.js", "TeX/AMSmath.js"],
-       jax: ["input/TeX", "output/HTML-CSS"],
-       tex2jax: {
-         inlineMath: [["$", "$"]],
-         processEscapes: true
-       }
-     });
-
-     function typesetMath() {
-       MathJax.Hub.Queue(["Typeset", MathJax.Hub, "main"]);
-     }
-
-     // TODO: Use a port instead.
-     setInterval(() => { typesetMath(); console.log("TYPESET"); }, 1000);
+     setInterval(() => MathJax.typeset(), 1000);
 
       var app = Elm.Main.init({node: document.getElementsByTagName("main")[0]});
     </script>
