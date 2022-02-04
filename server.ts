@@ -6,7 +6,8 @@ const glob = require(`glob`);
 
 const randomString = () => (Math.random() + 1).toString(36).substring(7);
 
-const app = require(`express`)();
+const express = require(`express`);
+const app = express();
 const bodyParser = require('body-parser');
 
 const md5 = x => crypto.createHash(`md5`).update(x).digest(`hex`);
@@ -14,6 +15,8 @@ const md5 = x => crypto.createHash(`md5`).update(x).digest(`hex`);
 app.use(require(`cors`)())
 
 app.use(bodyParser.json());
+
+app.use(express.static('public'));
 
 const crawlLessons = fileName => {
   const children = !!path.extname(fileName)
@@ -49,7 +52,6 @@ app.get(`/lessons`, (req, res) => {
 
 const guides = glob.sync(`${__dirname}/lessons/*/**.md`)
   .map(fileName => ({
-    type: `guide`,
     title: path.parse(fileName).name.replace(/^\d+ /,``),
     content: fs.readFileSync(fileName,`utf8`),
     hash: md5(fs.readFileSync(fileName)),
@@ -64,7 +66,6 @@ app.get(`/guide/:hash`, (req, res) => {
 
 const puzzles = glob.sync(`${__dirname}/lessons/*/**.sh`)
   .map(fileName => ({
-    type: `puzzle`,
     title: path.parse(fileName).name.replace(/^\d+ /,``),
     hash: md5(fs.readFileSync(fileName)),
     path: fileName,

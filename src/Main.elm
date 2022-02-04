@@ -8,13 +8,17 @@ module Main exposing (..)
 
 import Dict exposing (Dict)
 import Browser
-import Html exposing (Html, div, text, p, a, ul, li)
+import Html exposing (Html, div, text, p, a, ul, li, h1, h2, button)
 import Html.Attributes as Attr exposing (href)
+import Html.Events as Event exposing (onClick)
 import Regex exposing (Regex)
 import Http
 import Json.Decode as D
 import Browser.Navigation as Nav
 import Url exposing (Url)
+import Url.Parser as UrlParser exposing ((</>))
+import Url.Builder as UrlBuilder
+import Markdown
 
 
 -- MAIN -----------------------------------------------------------------------
@@ -60,14 +64,21 @@ type LessonType
 type alias Guide
   = { title : String
     , hash : String
-    , content : Html ()
+    , content : Html Msg
     }
 
+-- BUG: current = Just []
+-- BUG: history = [[]]
 type alias Puzzle
   = { title : String
     , hash : String
-    , current : Maybe (List { question : Html (), answer : Answer })
-    , history : List (List { question : Html (), answer : Html () })
+    , current : Maybe (List (QA Answer))
+    , history : List (List (QA (Html Msg)))
+    }
+
+type alias QA a
+  = { question : Html Msg
+    , answer : a
     }
 
 type alias Title = String
@@ -76,12 +87,10 @@ type Answer
   = Int
     { input : String
     , solution : Maybe Int
-    , fudge : Float
     }
   | Float
     { input : String
     , solution : Maybe Float
-    , fudge : Float
     }
   | Text
     { validation : Regex
@@ -89,7 +98,7 @@ type Answer
     , solution : Maybe String
     }
   | MultipleChoice
-    { options : List (Html ())
+    { options : List (Html Msg)
     , selected : Int
     , solution : Maybe Int
     }
@@ -124,25 +133,50 @@ lessonTypeDecoder typ =
     "puzzle" -> D.succeed LessonPuzzle
     _ -> D.fail "TODO"
 
--- [                                                                               
---   {                                                                                      
---     "title": "Test Lesson",                                                              
---     "hash": "cb7e4ec8654799ccbed3b1c7c9a3ca09",                                          
---     "lessons": [                                                                         
---       {                                                                                  
---         "title": "Test Guide",                                                           
---         "hash": "6f5902ac237024bdd0c176cb93063dc4",                                      
---         "type": "guide"                                                                  
---       },                                                                                 
---       {                                                                                  
---         "title": "Test Puzzle",                                                          
---         "hash": "5b6a641e2b358cb6507f367d4cb8392f",                                      
---         "type": "puzzle"                                                                 
---       }                                                                                  
---     ],                                                                                   
---     "type": "lesson"                                                                     
---   }                                                                                      
--- ]
+-- {                                                                                                              
+--   "6f5902ac237024bdd0c176cb93063dc4": {                                                                                
+--     "type": "guide",                                                                                                   
+--     "title": "Test Guide",                                                                                             
+--     "content": "hello world\n",                                                                                        
+--     "hash": "6f5902ac237024bdd0c176cb93063dc4"                                                                         
+--   }                                                                                                                    
+-- }   
+
+guideDecoder =
+  D.map3 Guide
+  (D.field "title" D.string)
+  (D.field "hash" D.string)
+  (D.field "content" markdownDecoder)
+
+puzzleDecoder =
+  D.map4 Puzzle
+  (D.field "title" D.string)
+  (D.field "hash" D.string)
+  (D.field "current" (D.maybe (D.list (qaDecoder optionsDecoder))))
+  (D.field "history" (D.list (D.list (qaDecoder markdownDecoder))))
+
+qaDecoder p =
+  D.map2 QA
+  (D.field "question" markdownDecoder)
+  (D.field "options" p)
+
+optionsDecoder
+  = D.oneOf
+    [ D.string
+      |> D.andThen
+         (\ x -> case x of
+            "INT" -> D.succeed
+              <| Int
+                 { input = ""
+                 , solution = Nothing
+                 }
+            _ -> D.fail "TODO"
+         )
+    ]
+
+markdownDecoder = D.string
+  |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [])
+
   
 
 -- UPDATE ---------------------------------------------------------------------
@@ -152,6 +186,10 @@ type Msg
   | UrlRequested Browser.UrlRequest
   | UrlChanged Url
   | LessonsFetched (Result Http.Error (List Lesson))
+  | GuideFetched (Result Http.Error Guide)
+  | PuzzleFetched (Result Http.Error Puzzle)
+  | PuzzleRequested String
+  | PuzzleRequestFinished String (Result Http.Error ())
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -159,13 +197,60 @@ update msg model =
     NoOp ->
       (model, Cmd.none)
     UrlRequested (Browser.Internal url) ->
-      -- TODO: If url starts with "/guide", start loading the guide, etc.
-      (model, Nav.pushUrl model.key (Url.toString url))
+      UrlParser.oneOf
+      [ UrlParser.s "guide" </> UrlParser.string
+        |> UrlParser.map
+           (\ hash -> Http.get
+              { url = "http://localhost:3000/guide/" ++ hash
+              , expect = Http.expectJson GuideFetched guideDecoder
+              }
+           )
+      , UrlParser.s "puzzle" </> UrlParser.string
+        |> UrlParser.map
+           (\ hash -> Http.get
+              { url = "http://localhost:3000/puzzle/" ++ hash
+              , expect = Http.expectJson PuzzleFetched puzzleDecoder
+              }
+           )
+      ]
+      |> UrlParser.map (Tuple.pair url)
+      |> (\ p -> UrlParser.parse p url)
+      |> Maybe.withDefault (Url.fromString "/" |> Maybe.withDefault url, Cmd.none)
+      |> (\ (newUrl, cmd) -> (model, Cmd.batch [cmd, Nav.pushUrl model.key (Url.toString newUrl)]))
     UrlRequested (Browser.External url) ->
       (model, Nav.load url)
     LessonsFetched (Ok lessons) ->
       ({ model | lessons = Loaded lessons }, Cmd.none)
     LessonsFetched (Err error) ->
+      ({ model | lessons = Error error }, Cmd.none)
+    GuideFetched (Ok guide) ->
+      ({ model | guide = Just guide }, Cmd.none)
+    GuideFetched (Err error) ->
+      ({ model | lessons = Error error }, Cmd.none)
+    PuzzleFetched (Ok puzzle) ->
+      ({ model | puzzle = Just puzzle }, Cmd.none)
+    PuzzleFetched (Err error) ->
+      ({ model | lessons = Error error }, Cmd.none)
+    PuzzleRequested hash ->
+      ( model
+      , Http.request
+        { method = "PUT"
+        , headers = []
+        , url = "http://localhost:3000/puzzle/" ++ hash
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever (PuzzleRequestFinished hash)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+      )
+    PuzzleRequestFinished hash (Ok ()) ->
+      ( model
+      , Http.get
+        { url = "http://localhost:3000/guide/" ++ hash
+        , expect = Http.expectJson GuideFetched guideDecoder
+        }
+      )
+    PuzzleRequestFinished hash (Err error) ->
       ({ model | lessons = Error error }, Cmd.none)
     _ ->
       (model, Cmd.none)
@@ -186,9 +271,12 @@ view model
   = { title
       = "TODO"
     , body
-      = case (model.puzzle, model.guide, model.lessons) of
-          (_, _, Loaded lessons) -> viewLessons lessons
-          x -> [ text (Debug.toString x) ]
+      = (a [href "/src/Main.elm"] [text "home"])
+        :: case (model.puzzle, model.guide, model.lessons) of
+             (Just puzzle, _, _) -> viewPuzzle puzzle
+             (_, Just guide, _) -> viewGuide guide
+             (_, _, Loaded lessons) -> viewLessons lessons
+             x -> [ text (Debug.toString x) ]
     }
 
 viewLessons = List.map viewLesson >> ul [] >> List.singleton
@@ -198,3 +286,20 @@ viewLesson (Lesson {typ,title,hash,lessons}) = case typ of
   LessonLesson -> li [] (a [] [text title] :: viewLessons lessons)
   LessonGuide -> li [] [a [href ("/guide/" ++ hash)] [text title]]
   LessonPuzzle -> li [] [a [href ("/puzzle/" ++ hash)] [text title]]
+
+viewGuide ({title,hash,content}) =
+  [ h1 [] [ text title ]
+  , h2 [] [ text hash ]
+  , div [] [ content ]
+  ]
+  
+viewPuzzle : Puzzle -> List (Html Msg)
+viewPuzzle {title,hash,current,history} =
+  [ h1 [] [ text title ]
+  , h2 [] [ text hash ]
+  , case current of
+      Nothing -> button [ onClick (PuzzleRequested hash) ] [ text "Start" ]
+      Just [] -> button [ onClick (PuzzleRequested hash) ] [ text "Start" ]
+      Just qas -> qas |> List.map (\{question} -> question) |> div []
+  ]
+  
