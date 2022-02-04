@@ -271,7 +271,7 @@ view model
   = { title
       = "TODO"
     , body
-      = (a [href "/src/Main.elm"] [text "home"])
+      = a [href "/"] [text "home"]
         :: case (model.puzzle, model.guide, model.lessons) of
              (Just puzzle, _, _) -> viewPuzzle puzzle
              (_, Just guide, _) -> viewGuide guide
