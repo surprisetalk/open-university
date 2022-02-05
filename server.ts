@@ -71,7 +71,11 @@ app.get(`/api/guide/:hash`, (req, res) => {
   res.json(guides[req.params.hash]);
 });
 
-const puzzles = glob.sync(`${__dirname}/lessons/*/**.sh`)
+const puzzles = [
+    ...glob.sync(`${__dirname}/lessons/*/**/*.sh`),
+    ...glob.sync(`${__dirname}/lessons/*/**/*.js`),
+    ...glob.sync(`${__dirname}/lessons/*/**/*.py`),
+  ]
   .map(fileName => ({
     title: path.parse(fileName).name.replace(/^\d+ /,``),
     hash: md5(fs.readFileSync(fileName)),
@@ -89,10 +93,32 @@ app.post(`/api/puzzle/:hash`, (req, res) => {
   if (req.body === undefined)
     throw new Error(`Request body is undefined.`);
   else if (req.body === null || req.body === '' || Object.keys(req.body).length === 0) {
-    openPuzzles[req.params.hash] = openPuzzles[req.params.hash]
-      ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`))
-        .map(({question,choices,solution}) => ({question,choices,solution}))
-        .map(({question}) => ({question: Handlebars.compile(fs.readFileSync(fileName,`utf8`))({ params: { vars: { name: `Linda` } } })}));
+    const puzzle = puzzles[req.params.hash];
+    switch (path.parse(puzzle.path).ext) {
+      case `.sh`:
+        openPuzzles[req.params.hash] = openPuzzles[req.params.hash]
+          ?? JSON.parse(require(`child_process`).execSync(`'${puzzle.path}'`))
+              .map(({question,choices,solution}) => ({question,choices,solution}));
+        break;
+      // case `.py`:
+      //   if {
+      //     const py = `python -c '${[
+      //       'import sys',
+      //       'sys.path.append('+puzzle.path+')',
+      //       'import generate',
+      //       'generate({})',
+      //     ].join('; ')}'`;
+      //     openPuzzles[req.params.hash] = openPuzzles[req.params.hash]
+      //       ?? JSON.parse(require(`child_process`).execSync(py))
+      //         .map(({question,choices,solution}) => ({question,choices,solution}));
+      //   } else {
+      //     throw new Error(`TODO`);
+      //   }
+      //   break;
+      default:
+        throw new Error(`Unsupported puzzle generator: ${puzzle.path}`);
+        break;
+    }
   } else {
     for (const i in req.body)
       openPuzzles[req.params.hash][i].guess = req.body[i];
