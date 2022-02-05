@@ -8,7 +8,7 @@ module Main exposing (..)
 
 import Dict exposing (Dict)
 import Browser
-import Html exposing (Html, div, text, p, a, ul, li, h1, h2, button, input, hr)
+import Html exposing (Html, div, text, p, a, ul, li, h1, h2, button, input, br, hr)
 import Html.Attributes as Attr exposing (href)
 import Html.Events as Event exposing (onClick, onInput)
 import Regex exposing (Regex)
@@ -208,7 +208,8 @@ type Msg
   | PuzzleRequestFinished String (Result Http.Error ())
   | PuzzleSubmitted
   | PuzzleSubmissionFinished String (Result Http.Error ())
-  | AnswerInputted String
+  | GuessedText Int String
+  | GuessedChoice Int Int
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -276,19 +277,42 @@ update msg model =
               = Http.expectWhatever (PuzzleRequestFinished hash)
             }
       )
-    AnswerInputted input ->
+    GuessedText i input ->
       ( { model
-          | puzzle = case model.puzzle of
-            Nothing -> Nothing
-            Just puzzle -> 
-              Just
-              { puzzle
-                | current
-                  = case puzzle.current of
-                      [] -> []
-                      qa :: qas -> { qa | answer = TextGuess Regex.never input } :: qas
-
-              }
+          | puzzle = model.puzzle
+            |> Maybe.map
+               (\ puzzle ->
+                  { puzzle
+                    | current = puzzle.current
+                      |> List.indexedMap
+                         (\ j qa ->
+                            if j == i
+                            then { qa | answer = TextGuess Regex.never input }
+                            else qa
+                         )
+                  }
+               )
+        }
+      , Cmd.none
+      )
+    GuessedChoice i newSelected ->
+      ( { model
+          | puzzle = model.puzzle
+            |> Maybe.map
+               (\ puzzle ->
+                  { puzzle
+                    | current = puzzle.current
+                      |> List.indexedMap
+                         (\ j qa ->
+                            if j == i
+                            then 
+                              case qa.answer of
+                                ChoiceGuess choices selected -> { qa | answer = ChoiceGuess choices newSelected }
+                                _ -> qa
+                            else qa
+                         )
+                  }
+               )
         }
       , Cmd.none
       )
@@ -357,9 +381,11 @@ viewPuzzle {title,hash,current,history} =
   , h2 [] [ text hash ]
   , case current of
       [] -> button [ onClick PuzzleRequested ] [ text "Start" ]
-      qas -> qas |> List.map (viewQA viewGuess) |> div []
+      qas -> qas |> List.indexedMap (\ i qa -> viewQA (viewGuess i) qa) |> div []
+  , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
   , hr [] []
   , div []
+    <| List.intersperse (hr [] [])
     <| List.map (div [] << List.map (\ {answer} -> viewSolution answer))
     <| List.map (\ (x,xs) -> x::xs)
     <| history
@@ -372,18 +398,20 @@ viewQA viewA {question,answer} =
   , viewA answer
   ]
 
-viewGuess : Guess -> Html Msg
-viewGuess guess = case guess of
+viewGuess : Int -> Guess -> Html Msg
+viewGuess i guess = case guess of
   TextGuess validation input ->
+    Html.input [ Attr.value input, onInput (GuessedText i) ] []
+  ChoiceGuess choices _ -> 
     div []
-    [ Html.input [ Attr.value input, onInput AnswerInputted ] []
-    , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
-    ]
-  ChoiceGuess choices selected -> 
-    div []
-    [ Html.input [ Attr.value (String.fromInt selected), onInput AnswerInputted ] []
-    , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
-    ]
+    <| List.indexedMap
+       (\ j choice ->
+          div []
+          [ choice
+          , button [ onClick (GuessedChoice i j) ] [ text "choose" ]
+          ]
+       )
+    <| choices
   
 
 viewSolution : Solution -> Html Msg
@@ -397,7 +425,7 @@ viewSolution answer = case answer of
   ChoiceSolution {choices,guess,solution} ->
     div []
     [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
-    , div [] <| List.map (div [] << List.singleton) choices
+    , div [] choices
     , p [] [ text <| "Your guess: " ++ String.fromInt guess ]
     , p [] [ text <| "Solution: " ++ String.fromInt solution ]
     ]

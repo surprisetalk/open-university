@@ -21,15 +21,15 @@ console.log(
         ? Math.floor(Math.random()*2)
         : `${Math.floor(Math.random()*2)}`,
     },
-    // {
-    //   question,
-    //   choices: [
-    //     `${Math.floor(Math.random()*100)}`,
-    //     `${Math.floor(Math.random()*100)}`,
-    //     `${Math.floor(Math.random()*100)}`,
-    //     `${Math.floor(Math.random()*100)}`,
-    //   ],
-    //   solution: Math.floor(Math.random()*4),
-    // },
+    {
+      question,
+      choices: [
+        `${Math.floor(Math.random()*100)}`,
+        `${Math.floor(Math.random()*100)}`,
+        `${Math.floor(Math.random()*100)}`,
+        `${Math.floor(Math.random()*100)}`,
+      ],
+      solution: Math.floor(Math.random()*4),
+    },
   ])
 );
