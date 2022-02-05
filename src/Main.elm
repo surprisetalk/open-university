@@ -192,7 +192,7 @@ nonEmptyListDecoder p
           y :: ys -> D.succeed (y,ys)
        )
 
-markdownDecoder = D.string |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [id "math"])
+markdownDecoder = D.string |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [class "markdown"])
 
 
 -- UPDATE ---------------------------------------------------------------------
@@ -385,16 +385,20 @@ viewPuzzle {title,hash,current,history} =
   , div [ id "current" ] <| case current of
       [] ->
         [ button [ onClick PuzzleRequested ] [ text "Start" ]
+        , if List.length history > 0
+          then h2 [] [ text "History" ]
+          else br [] []
+        , div [ id "history" ]
+          <| List.intersperse (br [] [])
+          <| List.map (div [] << List.map (viewQA viewSolution))
+          <| List.map (\ (x,xs) -> x::xs)
+          <| history
         ]
       qas ->
         [ div [] <| List.indexedMap (\ i qa -> viewQA (viewGuess i) qa) <| qas
+        , br [] []
         , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
         ]
-  , div [ id "history" ]
-    <| List.intersperse (hr [] [])
-    <| List.map (div [] << List.map (\ {answer} -> viewSolution answer))
-    <| List.map (\ (x,xs) -> x::xs)
-    <| history
   ]
 
 viewQA : (a -> Html Msg) -> QA a -> Html Msg
@@ -408,13 +412,18 @@ viewGuess : Int -> Guess -> Html Msg
 viewGuess i guess = div [ id "guess" ] <| List.singleton <| case guess of
   TextGuess validation input ->
     Html.input [ Attr.value input, onInput (GuessedText i) ] []
-  ChoiceGuess choices _ -> 
+  ChoiceGuess choices selected -> 
     div []
     <| List.indexedMap
-       (\ j choice ->
-          div [ id "choice" ]
+       (\ selection choice ->
+          button
+          [ class "choice"
+          , if selection == selected
+            then class "selected"
+            else class "unselected"
+          , onClick (GuessedChoice i selection)
+          ]
           [ choice
-          , button [ onClick (GuessedChoice i j) ] [ text "choose" ]
           ]
        )
     <| choices
@@ -423,13 +432,11 @@ viewGuess i guess = div [ id "guess" ] <| List.singleton <| case guess of
 viewSolution : Solution -> Html Msg
 viewSolution answer = div [ id "solution" ] <| case answer of
   TextSolution {guess,solution} ->
-    [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
-    , p [] [ text <| "Your guess: " ++ guess ]
+    [ p [] [ text <| "Your guess: " ++ guess ]
     , p [] [ text <| "Solution: " ++ solution ]
     ]
   ChoiceSolution {choices,guess,solution} ->
-    [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
-    , div [] choices
+    [ div [] <| List.map (\ choice -> button [ class "choice", Attr.disabled True ] [ choice ]) choices
     , p [] [ text <| "Your guess: " ++ String.fromInt guess ]
     , p [] [ text <| "Solution: " ++ String.fromInt solution ]
     ]
