@@ -4,10 +4,12 @@ const crypto = require('crypto');
 
 const glob = require(`glob`);
 
-const randomString = () => (Math.random() + 1).toString(36).substring(7);
+const Handlebars = require(`handlebars`);
 
 const express = require(`express`);
 const app = express();
+
+const randomString = () => (Math.random() + 1).toString(36).substring(7);
 
 const md5 = x => crypto.createHash(`md5`).update(x).digest(`hex`);
 
@@ -58,7 +60,7 @@ app.get(`/api/lessons`, (req, res) => {
 const guides = glob.sync(`${__dirname}/lessons/*/**/*.md`)
   .map(fileName => ({
     title: path.parse(fileName).name.replace(/^\d+ /,``),
-    content: fs.readFileSync(fileName,`utf8`),
+    content: Handlebars.compile(fs.readFileSync(fileName,`utf8`))({ params: { vars: { name: `Linda` } } }),
     hash: md5(fs.readFileSync(fileName)),
   }))
   .reduce((acc,val) => { acc[val.hash] = val; return acc; }, {});
@@ -89,7 +91,8 @@ app.post(`/api/puzzle/:hash`, (req, res) => {
   else if (req.body === null || req.body === '' || Object.keys(req.body).length === 0) {
     openPuzzles[req.params.hash] = openPuzzles[req.params.hash]
       ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`))
-        .map(({question,choices,solution}) => ({question,choices,solution}));
+        .map(({question,choices,solution}) => ({question,choices,solution}))
+        .map(({question}) => ({question: Handlebars.compile(fs.readFileSync(fileName,`utf8`))({ params: { vars: { name: `Linda` } } })}));
   } else {
     for (const i in req.body)
       openPuzzles[req.params.hash][i].guess = req.body[i];
