@@ -52,8 +52,8 @@ type Loadable a
 type Lesson
   = Lesson
     { typ : LessonType
-    , title : Title
-    , hash : Hash
+    , title : String
+    , hash : String
     , lessons : List Lesson
     }
 
@@ -63,14 +63,14 @@ type LessonType
   | LessonPuzzle
 
 type alias Guide
-  = { title : Title
-    , hash : Hash
+  = { title : String
+    , hash : String
     , content : Html Msg
     }
 
 type alias Puzzle
-  = { title : Title
-    , hash : Hash
+  = { title : String
+    , hash : String
     , current : List (QA Guess)
     , history : List (NonEmptyList (QA Solution))
     }
@@ -80,21 +80,9 @@ type alias QA a
     , answer : a
     }
 
-type alias Title
-  = String
-
-type alias Hash
-  = String
-
 type Guess
-  = TextGuess
-    { validation : Regex
-    , input : String
-    }
-  | ChoiceGuess
-    { choices : List (Html Msg)
-    , selected : Int
-    }
+  = TextGuess Regex String
+  | ChoiceGuess (List (Html Msg)) Int
 
 type Solution
   = TextSolution
@@ -166,8 +154,8 @@ guessDecoder
   = D.list markdownDecoder
     |> D.map
        (\ answer -> case answer of
-          [] -> TextGuess { validation = Regex.never, input = "" }
-          choices -> ChoiceGuess { choices = choices, selected = 0 } 
+          [] -> TextGuess Regex.never ""
+          choices -> ChoiceGuess choices 0
        )
 
 qaSolutionDecoder =
@@ -267,8 +255,8 @@ update msg model =
               = Http.jsonBody
                 ( E.list
                   (\ qa -> case qa.answer of
-                     TextGuess {input} -> E.string input
-                     ChoiceGuess {selected} -> E.int selected
+                     TextGuess _ input -> E.string input
+                     ChoiceGuess _ selected -> E.int selected
                   )
                   current
                 )
@@ -286,7 +274,7 @@ update msg model =
                 | current
                   = case puzzle.current of
                       [] -> []
-                      qa :: qas -> { qa | answer = TextGuess { validation = Regex.never, input = input } } :: qas
+                      qa :: qas -> { qa | answer = TextGuess Regex.never input } :: qas
 
               }
         }
@@ -360,7 +348,10 @@ viewPuzzle {title,hash,current,history} =
       [] -> button [ onClick PuzzleRequested ] [ text "Start" ]
       qas -> qas |> List.map (viewQA viewGuess) |> div []
   , hr [] []
-  , text (String.fromInt (List.length history))
+  , div []
+    <| List.map (div [] << List.map (viewQA viewSolution))
+    <| List.map (\ (x,xs) -> x::xs)
+    <| history
   ]
 
 viewQA : (a -> Html Msg) -> QA a -> Html Msg
@@ -371,11 +362,19 @@ viewQA viewA {question,answer} =
   ]
 
 viewGuess : Guess -> Html Msg
-viewGuess answer = case answer of
-  TextGuess { validation, input } ->
+viewGuess guess = case guess of
+  TextGuess validation input ->
     div []
     [ Html.input [ Attr.value input, onInput AnswerInputted ] []
     , button [ onClick PuzzleSubmitted ] []
     ]
-  ChoiceGuess { choices, selected } -> text "TODO"
+  ChoiceGuess choices selected -> text "TODO"
+  
+
+viewSolution : Solution -> Html Msg
+viewSolution answer = case answer of
+  TextSolution {guess,solution} ->
+    div [] [ text guess, text solution ]
+  ChoiceSolution {choices,guess,solution} ->
+    div [] [ text (String.fromInt guess), text (String.fromInt solution) ]
   
