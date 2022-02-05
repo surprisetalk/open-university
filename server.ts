@@ -18,15 +18,20 @@ app.use(express.json())
 
 app.use(express.static(`public`));
 
+const isDir = fileName =>
+  fs.existsSync(fileName)
+  && fs.lstatSync(fileName).isDirectory();
+
 const crawlLessons = fileName => {
-  const children = !!path.extname(fileName)
+  const children = !isDir(fileName)
     ? undefined
     : fs.readdirSync(fileName)
       .map(fileName_ => path.join(fileName,fileName_))
-      .map(crawlLessons);
+      .map(crawlLessons)
+      .filter(x=>x);
   const parent = {
     title: path.parse(fileName).name.replace(/^\d+ /,``),
-    hash: !!path.extname(fileName)
+    hash: !isDir(fileName)
       ? md5(fs.readFileSync(fileName))
       : md5(children.map(x => x.hash).join(``)),
     lessons: children,
@@ -35,7 +40,7 @@ const crawlLessons = fileName => {
     case `.md`: parent.type = `guide`; break;
     case `.sh`: parent.type = `puzzle`; break;
     case ``: parent.type = `lesson`; break;
-    default: throw new Error(fileName);
+    default: return undefined;
   }
   return parent;
 };
@@ -50,7 +55,7 @@ app.get(`/api/lessons`, (req, res) => {
   res.json(lessons);
 });
 
-const guides = glob.sync(`${__dirname}/lessons/*/**.md`)
+const guides = glob.sync(`${__dirname}/lessons/*/**/*.md`)
   .map(fileName => ({
     title: path.parse(fileName).name.replace(/^\d+ /,``),
     content: fs.readFileSync(fileName,`utf8`),

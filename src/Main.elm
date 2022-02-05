@@ -192,7 +192,18 @@ nonEmptyListDecoder p
           y :: ys -> D.succeed (y,ys)
        )
 
-markdownDecoder = D.string |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [class "markdown"])
+-- TODO: Don't sanitize HTML.
+markdownDecoder
+  = D.string
+  |> D.map
+     ( Markdown.toHtmlWith
+       { githubFlavored = Just { tables = True, breaks = True }
+       , defaultHighlighting = Nothing
+       , sanitize = False
+       , smartypants = True
+       }
+       [ class "markdown" ]
+     )
 
 
 -- UPDATE ---------------------------------------------------------------------
@@ -439,6 +450,7 @@ viewSolution answer = div [ id "solution" ] <| case answer of
     [ p [] [ text <| "Your guess: " ++ guess ]
     , p [] [ text <| "Solution: " ++ solution ]
     ]
+  -- TODO: Show choice instead of its index.
   ChoiceSolution {choices,guess,solution} ->
     [ div [] <| List.map (\ choice -> button [ class "choice", Attr.disabled True ] [ choice ]) choices
     , p [] [ text <| "Your guess: " ++ String.fromInt guess ]
