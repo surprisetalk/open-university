@@ -350,12 +350,14 @@ subscriptions model =
 
 -- VIEW -----------------------------------------------------------------------
 
+-- TODO: Use artcles/sections to space out sections of page.
+
 view : Model -> Browser.Document Msg
 view model
   = { title
       = "TODO"
     , body
-      = [ Html.header [] [ a [ href "/" ] [ text "🏠" ] ]
+      = [ Html.header [] [ a [ href "/" ] [ text "home" ] ]
         , case (model.puzzle, model.guide, model.lessons) of
            (Just puzzle, _, _) -> viewPuzzle puzzle
            (_, Just guide, _) -> viewGuide guide
@@ -385,14 +387,16 @@ viewPuzzle {title,hash,current,history} =
   , div [ id "current" ] <| case current of
       [] ->
         [ button [ onClick PuzzleRequested ] [ text "Start" ]
+        , br [] []
         , if List.length history > 0
-          then h2 [] [ text "History" ]
+          then 
+            div [ id "history" ]
+            <| (::) (h2 [] [ text "History" ])
+            <| List.intersperse (br [] [])
+            <| List.map (div [] << List.map (viewQA viewSolution))
+            <| List.map (\ (x,xs) -> x::xs)
+            <| history
           else br [] []
-        , div [ id "history" ]
-          <| List.intersperse (br [] [])
-          <| List.map (div [] << List.map (viewQA viewSolution))
-          <| List.map (\ (x,xs) -> x::xs)
-          <| history
         ]
       qas ->
         [ div [] <| List.indexedMap (\ i qa -> viewQA (viewGuess i) qa) <| qas

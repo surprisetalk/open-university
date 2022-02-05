@@ -17,15 +17,22 @@
     
     <script src="/elm.js"></script>
 
+    <link rel="stylesheet" href="https://raw.githack.com/waldyrious/downstyler/master/downstyler.css" />
+    <!-- <link rel="stylesheet" href="https://raw.githack.com/edwardtufte/tufte-css/gh-pages/tufte.min.css" /> -->
+
     <style>
-      html {
-        padding: 5rem;
-      }
       body {
-        max-width: 30rem;
+        max-width: 28rem;
+        margin-top: 2rem;
+      }
+      ul, menu, dir {
+        padding-inline-start: 20px;
       }
       .markdown mjx-container[jax="SVG"][display="true"] {
         text-align: left;
+      }
+      #history {
+        margin-top: 5rem;
       }
       button.choice.unselected {
         opacity: 0.35;
