@@ -9,7 +9,7 @@ module Main exposing (..)
 import Dict exposing (Dict)
 import Browser
 import Html exposing (Html, div, text, p, a, ul, li, h1, h2, button, input, br, hr)
-import Html.Attributes as Attr exposing (href)
+import Html.Attributes as Attr exposing (id, class, href)
 import Html.Events as Event exposing (onClick, onInput)
 import Regex exposing (Regex)
 import Http
@@ -192,7 +192,7 @@ nonEmptyListDecoder p
           y :: ys -> D.succeed (y,ys)
        )
 
-markdownDecoder = D.string |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [Attr.id "math"])
+markdownDecoder = D.string |> D.map (Markdown.toHtmlWith Markdown.defaultOptions [id "math"])
 
 
 -- UPDATE ---------------------------------------------------------------------
@@ -222,6 +222,8 @@ update msg model =
         Just cmd -> (model, Cmd.batch [cmd, Nav.pushUrl model.key (Url.toString url)])
     UrlRequested (Browser.External url) ->
       (model, Nav.load url)
+    UrlChanged _ ->
+      (model, Cmd.none)
     LessonsFetched (Ok lessons) ->
       ({ model | lessons = Loaded lessons }, Cmd.none)
     LessonsFetched (Err error) ->
@@ -316,7 +318,7 @@ update msg model =
         }
       , Cmd.none
       )
-    _ ->
+    PuzzleSubmissionFinished _ _ ->
       (model, Cmd.none)
 
 route : Url -> Maybe (Cmd Msg)
@@ -353,12 +355,13 @@ view model
   = { title
       = "TODO"
     , body
-      = a [href "/"] [text "home"]
-        :: case (model.puzzle, model.guide, model.lessons) of
-             (Just puzzle, _, _) -> viewPuzzle puzzle
-             (_, Just guide, _) -> viewGuide guide
-             (_, _, Loaded lessons) -> viewLessons lessons
-             x -> [ text (Debug.toString x) ]
+      = [ Html.header [] [ a [ href "/" ] [ text "🏠" ] ]
+        , case (model.puzzle, model.guide, model.lessons) of
+           (Just puzzle, _, _) -> viewPuzzle puzzle
+           (_, Just guide, _) -> viewGuide guide
+           (_, _, Loaded lessons) -> div [ id "lessons" ] <| viewLessons lessons
+           x -> div [] [ text (Debug.toString x) ]
+        ]
     }
 
 viewLessons = List.map viewLesson >> ul [] >> List.singleton
@@ -370,21 +373,24 @@ viewLesson (Lesson {typ,title,hash,lessons}) = case typ of
   LessonPuzzle -> li [] [a [href ("/puzzle/" ++ hash)] [text title]]
 
 viewGuide ({title,hash,content}) =
+  div [ id "guide" ]
   [ h1 [] [ text title ]
-  , h2 [] [ text hash ]
-  , div [] [ content ]
+  , content
   ]
   
-viewPuzzle : Puzzle -> List (Html Msg)
+viewPuzzle : Puzzle -> Html Msg
 viewPuzzle {title,hash,current,history} =
+  div [ id "puzzle" ]
   [ h1 [] [ text title ]
-  , h2 [] [ text hash ]
-  , case current of
-      [] -> button [ onClick PuzzleRequested ] [ text "Start" ]
-      qas -> qas |> List.indexedMap (\ i qa -> viewQA (viewGuess i) qa) |> div []
-  , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
-  , hr [] []
-  , div []
+  , div [ id "current" ] <| case current of
+      [] ->
+        [ button [ onClick PuzzleRequested ] [ text "Start" ]
+        ]
+      qas ->
+        [ div [] <| List.indexedMap (\ i qa -> viewQA (viewGuess i) qa) <| qas
+        , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
+        ]
+  , div [ id "history" ]
     <| List.intersperse (hr [] [])
     <| List.map (div [] << List.map (\ {answer} -> viewSolution answer))
     <| List.map (\ (x,xs) -> x::xs)
@@ -393,20 +399,20 @@ viewPuzzle {title,hash,current,history} =
 
 viewQA : (a -> Html Msg) -> QA a -> Html Msg
 viewQA viewA {question,answer} =
-  div []
+  div [ class "qa" ]
   [ question
   , viewA answer
   ]
 
 viewGuess : Int -> Guess -> Html Msg
-viewGuess i guess = case guess of
+viewGuess i guess = div [ id "guess" ] <| List.singleton <| case guess of
   TextGuess validation input ->
     Html.input [ Attr.value input, onInput (GuessedText i) ] []
   ChoiceGuess choices _ -> 
     div []
     <| List.indexedMap
        (\ j choice ->
-          div []
+          div [ id "choice" ]
           [ choice
           , button [ onClick (GuessedChoice i j) ] [ text "choose" ]
           ]
@@ -415,15 +421,13 @@ viewGuess i guess = case guess of
   
 
 viewSolution : Solution -> Html Msg
-viewSolution answer = case answer of
+viewSolution answer = div [ id "solution" ] <| case answer of
   TextSolution {guess,solution} ->
-    div []
     [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
     , p [] [ text <| "Your guess: " ++ guess ]
     , p [] [ text <| "Solution: " ++ solution ]
     ]
   ChoiceSolution {choices,guess,solution} ->
-    div []
     [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
     , div [] choices
     , p [] [ text <| "Your guess: " ++ String.fromInt guess ]
