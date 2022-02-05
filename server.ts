@@ -8,13 +8,13 @@ const randomString = () => (Math.random() + 1).toString(36).substring(7);
 
 const express = require(`express`);
 const app = express();
-const bodyParser = require('body-parser');
 
 const md5 = x => crypto.createHash(`md5`).update(x).digest(`hex`);
 
 app.use(require(`cors`)())
 
-app.use(bodyParser.json());
+app.use(express.text())
+app.use(express.json())
 
 app.use(express.static(`public`));
 
@@ -78,16 +78,17 @@ const openPuzzles = {};
 
 const pastPuzzles = {};
 
-app.put(`/api/puzzle/:hash`, (req, res) => {
-  openPuzzles[req.params.hash] = openPuzzles[req.params.hash] ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`));
-  res.status(204).send();
-});
-
 app.post(`/api/puzzle/:hash`, (req, res) => {
-  pastPuzzles[req.params.hash] =
-    (openPuzzles[req.params.hash].map(x => ({ ...x, guess: `TODO` })) ?? [])
-      .concat(pastPuzzles[req.params.hash]);
-  openPuzzles[req.params.hash] = undefined;
+  if (req.body === undefined)
+    throw new Error(`Request body is undefined.`);
+  else if (req.body === null || req.body === '' || Object.keys(req.body).length === 0)
+    openPuzzles[req.params.hash] = openPuzzles[req.params.hash] ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`));
+  else {
+    pastPuzzles[req.params.hash] =
+      [ openPuzzles[req.params.hash].map(x => ({ ...x, guess: `TODO` })) ?? [] ]
+        .concat(pastPuzzles[req.params.hash] ?? []);
+    openPuzzles[req.params.hash] = undefined;
+  }
   res.status(204).send();
 });
 
