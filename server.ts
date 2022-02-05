@@ -81,11 +81,15 @@ const pastPuzzles = {};
 app.post(`/api/puzzle/:hash`, (req, res) => {
   if (req.body === undefined)
     throw new Error(`Request body is undefined.`);
-  else if (req.body === null || req.body === '' || Object.keys(req.body).length === 0)
-    openPuzzles[req.params.hash] = openPuzzles[req.params.hash] ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`));
-  else {
+  else if (req.body === null || req.body === '' || Object.keys(req.body).length === 0) {
+    openPuzzles[req.params.hash] = openPuzzles[req.params.hash]
+      ?? JSON.parse(require(`child_process`).execSync(`'${puzzles[req.params.hash].path}'`))
+        .map(({question,choices,solution}) => ({question,choices,solution}));
+  } else {
+    for (const i in req.body)
+      openPuzzles[req.params.hash][i].guess = req.body[i];
     pastPuzzles[req.params.hash] =
-      [ openPuzzles[req.params.hash].map(x => ({ ...x, guess: `TODO` })) ?? [] ]
+      [ openPuzzles[req.params.hash] ?? [] ]
         .concat(pastPuzzles[req.params.hash] ?? []);
     openPuzzles[req.params.hash] = undefined;
   }
@@ -96,7 +100,7 @@ app.get(`/api/puzzle/:hash`, (req, res) => {
   res.json({
     ...puzzles[req.params.hash],
     current: openPuzzles[req.params.hash]
-      ? openPuzzles[req.params.hash].map(x => { x.answer = null; return x; })
+      ? openPuzzles[req.params.hash].map(x => ({...x,solution:null}))
       : null,
     history: pastPuzzles[req.params.hash] ?? [],
     path: undefined,

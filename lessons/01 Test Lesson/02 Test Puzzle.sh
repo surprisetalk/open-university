@@ -16,10 +16,20 @@ console.log(
   JSON.stringify([
     {
       question,
-      solution: "4",
       choices: [],
-      // choices: ["A","B"],
-      fudge: 0.0,
+      solution: Math.random() < 0.5
+        ? Math.floor(Math.random()*2)
+        : `${Math.floor(Math.random()*2)}`,
     },
+    // {
+    //   question,
+    //   choices: [
+    //     `${Math.floor(Math.random()*100)}`,
+    //     `${Math.floor(Math.random()*100)}`,
+    //     `${Math.floor(Math.random()*100)}`,
+    //     `${Math.floor(Math.random()*100)}`,
+    //   ],
+    //   solution: Math.floor(Math.random()*4),
+    // },
   ])
 );

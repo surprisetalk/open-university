@@ -164,13 +164,25 @@ qaSolutionDecoder =
   ( D.oneOf
     [ D.map3 (\ choices guess solution -> ChoiceSolution { choices = choices, guess = guess, solution = solution })
       (D.field "choices" (D.list markdownDecoder))
-      (D.field "guess" D.int)
-      (D.field "solution" D.int)
+      (D.field "guess" intParser)
+      (D.field "solution" intParser)
     , D.map2 (\ guess solution -> TextSolution { guess = guess, solution = solution })
-      (D.field "guess" D.string)
-      (D.field "solution" D.string)
+      (D.field "guess" stringParser)
+      (D.field "solution" stringParser)
     ]
   )
+
+intParser = D.oneOf
+  [ D.map String.toInt D.string
+    |> D.andThen (Maybe.map D.succeed >> Maybe.withDefault (D.fail "TODO"))
+  , D.int
+  ]
+
+stringParser = D.oneOf
+  [ D.string
+  , D.int |> D.map String.fromInt
+  , D.float |> D.map String.fromFloat
+  ]
 
 nonEmptyListDecoder p
   = D.list p
@@ -343,13 +355,12 @@ viewPuzzle : Puzzle -> List (Html Msg)
 viewPuzzle {title,hash,current,history} =
   [ h1 [] [ text title ]
   , h2 [] [ text hash ]
-  , button [ onClick PuzzleRequested ] [ text "Start" ]
   , case current of
       [] -> button [ onClick PuzzleRequested ] [ text "Start" ]
       qas -> qas |> List.map (viewQA viewGuess) |> div []
   , hr [] []
   , div []
-    <| List.map (div [] << List.map (viewQA viewSolution))
+    <| List.map (div [] << List.map (\ {answer} -> viewSolution answer))
     <| List.map (\ (x,xs) -> x::xs)
     <| history
   ]
@@ -366,15 +377,28 @@ viewGuess guess = case guess of
   TextGuess validation input ->
     div []
     [ Html.input [ Attr.value input, onInput AnswerInputted ] []
-    , button [ onClick PuzzleSubmitted ] []
+    , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
     ]
-  ChoiceGuess choices selected -> text "TODO"
+  ChoiceGuess choices selected -> 
+    div []
+    [ Html.input [ Attr.value (String.fromInt selected), onInput AnswerInputted ] []
+    , button [ onClick PuzzleSubmitted ] [ text "Submit" ]
+    ]
   
 
 viewSolution : Solution -> Html Msg
 viewSolution answer = case answer of
   TextSolution {guess,solution} ->
-    div [] [ text guess, text solution ]
+    div []
+    [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
+    , p [] [ text <| "Your guess: " ++ guess ]
+    , p [] [ text <| "Solution: " ++ solution ]
+    ]
   ChoiceSolution {choices,guess,solution} ->
-    div [] [ text (String.fromInt guess), text (String.fromInt solution) ]
+    div []
+    [ p [] [ text <| if guess == solution then "Correct!" else "Wrong..." ]
+    , div [] <| List.map (div [] << List.singleton) choices
+    , p [] [ text <| "Your guess: " ++ String.fromInt guess ]
+    , p [] [ text <| "Solution: " ++ String.fromInt solution ]
+    ]
   
